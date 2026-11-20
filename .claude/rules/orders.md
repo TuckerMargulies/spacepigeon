@@ -37,4 +37,4 @@ globs: ["api/**", "admin/**", "assets/order.js", "supabase/**", "e2e/orders.spec
 ## Tests
 
 - `e2e/support/stub-services.mjs` stands in for Supabase and Resend (`SUPABASE_URL` / `RESEND_API_URL` point at it in `playwright.config.mjs`); tests read `/__state` to check what was stored and sent. Never hit the real services from tests.
-- Form tests disable WebGL (`getContext → null`) so they don't wait on the 3D.
+- WebGL is off in tests by default (`e2e/support/test.mjs`), so form tests never wait on the 3D.

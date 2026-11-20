@@ -63,6 +63,8 @@ Order requests, admin and email rules: `.claude/rules/orders.md`. Env vars: `.en
 
 Every change that touches `index.html` or `assets/` updates or adds an E2E test in the same PR.
 
+- Specs import `test` from `e2e/support/test.mjs`, which turns WebGL **off** (software rendering is slow and most tests are about markup, forms and the API). Only `e2e/webgl.spec.mjs` turns it on, at a small viewport, to check every shader compiles on every page. Keep it that way: the whole suite should run in well under a minute.
+
 ## CI
 
 CI runs on every PR to `staging` or `main`: `lint` and `unit-tests`, then `e2e`.
