@@ -38,23 +38,25 @@ section[id]{scroll-margin-top:84px}
 @keyframes sp-shine{from{background-position:0% 0}to{background-position:-250% 0}}
 @media (prefers-reduced-motion: reduce){.sp-shine{animation:none}}
 .sp-grid-paper{background-image:linear-gradient(rgba(242,239,230,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(242,239,230,0.06) 1px,transparent 1px);background-size:22px 22px;background-position:-1px -1px}
+@media (max-width: 640px){.sp-hdr{flex-wrap:nowrap !important;gap:8px !important;padding:8px 16px !important}.sp-social{display:none !important}.sp-nav{flex-wrap:nowrap !important;gap:0 !important}.sp-nav a{padding:12px 10px !important;font-size:12px !important}.sp-brand{gap:10px !important}.sp-brand span{font-size:15px !important}.sp-sections{flex-wrap:nowrap !important;overflow-x:auto;scrollbar-width:none;gap:22px !important;padding:0 16px !important}.sp-sections::-webkit-scrollbar{display:none}.sp-sections a{padding:12px 0 !important;white-space:nowrap}section[id]{scroll-margin-top:104px}}
+@media (max-width: 340px){.sp-brand span{display:none}}
 </style>
 </head>
 <body>
 <div style="background: #07080F; color: #F2EFE6; font-family: Inter, system-ui, sans-serif; min-height: 100vh; overflow-x: clip">
 
 <div class="sp-sticky" style="position: sticky; top: 0; z-index: 50; background: rgba(7,8,15,0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)">
-<header style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; padding: 18px clamp(20px, 4vw, 56px); border-bottom: 1px solid rgba(242,239,230,0.12)">
-  <a href="/#landing" aria-label="Space Pigeon" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #F2EFE6; min-height: 44px">
+<header class="sp-hdr" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; padding: 18px clamp(20px, 4vw, 56px); border-bottom: 1px solid rgba(242,239,230,0.12)">
+  <a href="/#landing" class="sp-brand" aria-label="Space Pigeon" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #F2EFE6; min-height: 44px">
     <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="17" r="11" stroke="#F2EFE6" stroke-width="2"></circle><path d="M9 15a7 7 0 0 1 14 0v3H9z" stroke="#F2EFE6" stroke-width="2" stroke-linejoin="round"></path><path d="M16 6V2" stroke="#FF6B2C" stroke-width="2" stroke-linecap="round"></path><circle cx="16" cy="2" r="1.6" fill="#FF6B2C"></circle></svg>
     <span style="font-family: Unbounded, sans-serif; font-weight: 800; font-size: 17px; letter-spacing: 0.06em">SPACE PIGEON</span>
   </a>
-  <nav aria-label="Primary" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+  <nav class="sp-nav" aria-label="Primary" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
     <a href="/#sph72" style="font-family: Unbounded, sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.08em; text-decoration: none; padding: 12px 16px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">HELMETS</a>
     <a href="/about/" aria-current="page" style="font-family: Unbounded, sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.08em; text-decoration: none; padding: 12px 16px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; color: #FF6B2C">About</a>
-    <span aria-hidden="true" style="width: 1px; height: 20px; background: rgba(242,239,230,0.2); margin: 0 8px"></span>
-    <a href="https://www.instagram.com/coalescenyc/" target="_blank" rel="noopener noreferrer" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #A7A9B4; text-decoration: none; padding: 12px 8px">Instagram</a>
-    <a href="https://www.linkedin.com/company/coalesce-creative" target="_blank" rel="noopener noreferrer" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #A7A9B4; text-decoration: none; padding: 12px 8px">LinkedIn</a>
+    <span class="sp-social" aria-hidden="true" style="width: 1px; height: 20px; background: rgba(242,239,230,0.2); margin: 0 8px"></span>
+    <a class="sp-social" href="https://www.instagram.com/coalescenyc/" target="_blank" rel="noopener noreferrer" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #A7A9B4; text-decoration: none; padding: 12px 8px">Instagram</a>
+    <a class="sp-social" href="https://www.linkedin.com/company/coalesce-creative" target="_blank" rel="noopener noreferrer" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #A7A9B4; text-decoration: none; padding: 12px 8px">LinkedIn</a>
   </nav>
 </header>
 </div>
