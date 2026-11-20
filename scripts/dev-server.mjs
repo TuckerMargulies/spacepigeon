@@ -23,7 +23,7 @@ const ROUTES = {
   '/api/admin/session': 'api/admin/session.js',
   '/api/admin/orders': 'api/admin/orders.js',
 };
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.css': 'text/css', '.svg': 'image/svg+xml' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.css': 'text/css', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml', '.webmanifest': 'application/manifest+json' };
 const PRIVATE = /^\/(api|supabase|scripts|e2e|tests|node_modules|\.)/;
 
 createServer(async (req, res) => {
