@@ -14,9 +14,10 @@ test('about page tells the original story and links back to the helmets', async 
   await expect(page.getByText('Cher Ami')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Dickin Medal' })).toHaveAttribute('href', 'https://en.wikipedia.org/wiki/Dickin_Medal');
   await expect(page.getByText(/SUPERHEROS|SERIOUSLY HEROS/)).toHaveCount(0);
-  // the Coalesce logo (traced artwork, not text) links to the agency
+  // the Coalesce logo (the supplied artwork) links to the agency
   const logo = page.getByRole('img', { name: 'Coalesce' });
   await expect(logo).toBeVisible();
+  expect(await logo.evaluate((img) => img.naturalWidth)).toBeGreaterThan(1500);
   await expect(page.locator('a[href="https://coalesce.nyc"]').filter({ has: logo })).toHaveCount(1);
   // every illustration is the shared pigeon drawing, with a text alternative
   await expect(page.locator('#sp-bird')).toHaveCount(1);
