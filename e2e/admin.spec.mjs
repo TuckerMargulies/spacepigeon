@@ -1,7 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, STUB } from './support/test.mjs';
 import { validOrder } from './support/fixtures.mjs';
 
-const STUB = 'http://localhost:8788';
 const state = async (request) => (await request.get(`${STUB}/__state`)).json();
 
 test.beforeEach(async ({ request }) => {

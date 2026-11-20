@@ -1,11 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, watchErrors } from './support/test.mjs';
 
 test('about page tells the original story and links back to the helmets', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => {
-    if (m.type() === 'error' || m.text().includes('[spacepigeon]')) errors.push(m.text());
-  });
+  const errors = watchErrors(page);
 
   await page.goto('/');
   await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'About' }).click();
@@ -21,7 +17,6 @@ test('about page tells the original story and links back to the helmets', async 
   await expect(page.getByRole('link', { name: 'Reconsider the Pigeon.' })).toHaveAttribute('href', '#reconsider');
   await expect(page.locator('canvas[data-sp-scene="0"][data-sp-bg="1"]')).toHaveCount(1);
 
-  await page.waitForTimeout(3000);
   expect(errors).toEqual([]);
 
   await page.getByRole('link', { name: 'BACK TO HELMETS' }).click();
