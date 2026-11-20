@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Order requests · Space Pigeon admin</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #07080F; color: #F2EFE6; font-family: Inter, system-ui, -apple-system, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 18px clamp(16px, 4vw, 40px); border-bottom: 1px solid rgba(242,239,230,0.12); }
+  .brand { font-weight: 800; letter-spacing: 0.08em; font-size: 15px; }
+  .brand span { color: #A7A9B4; font-weight: 500; letter-spacing: 0.04em; margin-left: 10px; }
+  main { padding: 28px clamp(16px, 4vw, 40px); max-width: 1280px; margin: 0 auto; box-sizing: border-box; }
+  h1 { margin: 0 0 6px; font-size: 24px; }
+  p { color: #C9CAD2; line-height: 1.55; }
+  .card { max-width: 420px; display: flex; flex-direction: column; gap: 14px; }
+  label { font-size: 13px; color: #C9CAD2; }
+  input, select { font: inherit; font-size: 16px; color: #F2EFE6; background: #0D0F19; border: 1px solid rgba(242,239,230,0.24); border-radius: 6px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; }
+  button { font: inherit; font-weight: 600; min-height: 44px; padding: 0 20px; border-radius: 999px; border: 0; background: #FF6B2C; color: #07080F; cursor: pointer; align-self: flex-start; }
+  button.ghost { background: transparent; color: #F2EFE6; border: 1px solid rgba(242,239,230,0.3); }
+  :focus-visible { outline: 2px solid #FF6B2C; outline-offset: 2px; }
+  .msg { min-height: 1.5em; margin: 0; }
+  .toolbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .table-wrap { overflow-x: auto; border: 1px solid rgba(242,239,230,0.12); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 980px; font-size: 14px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid rgba(242,239,230,0.08); vertical-align: top; }
+  th { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #A7A9B4; font-weight: 600; background: #0D0F19; position: sticky; top: 0; }
+  td.mono { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 13px; }
+  td .sub { color: #A7A9B4; font-size: 13px; }
+  .notes { max-width: 260px; white-space: pre-wrap; color: #C9CAD2; }
+  .empty { padding: 32px; text-align: center; color: #A7A9B4; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">SPACE PIGEON<span>Admin</span></div>
+  <button type="button" class="ghost" id="signout" hidden>Sign out</button>
+</header>
+<main>
+  <!-- Signed out: ask for an email -->
+  <section id="v-signin" hidden>
+    <h1>Sign in</h1>
+    <p>Enter your admin email and we'll send you a sign-in link.</p>
+    <form class="card" id="signin-form">
+      <label for="si-email">Email</label>
+      <input id="si-email" name="email" type="email" autocomplete="email" required>
+      <button type="submit">Email me a link</button>
+      <p class="msg" id="signin-msg" role="status"></p>
+    </form>
+  </section>
+
+  <!-- Arrived from an email link: a button spends the token (mail scanners open links). -->
+  <section id="v-continue" hidden>
+    <h1>Continue to admin</h1>
+    <p>Press continue to finish signing in.</p>
+    <div class="card">
+      <button type="button" id="continue">Continue</button>
+      <p class="msg" id="continue-msg" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- Signed in: the order requests -->
+  <section id="v-orders" hidden>
+    <div class="toolbar">
+      <div>
+        <h1>Order requests</h1>
+        <p class="msg" id="orders-msg" role="status"></p>
+      </div>
+      <div class="filters">
+        <label for="filter">Show</label>
+        <select id="filter">
+          <option value="all">All</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="fulfilled">Fulfilled</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <button type="button" class="ghost" id="refresh">Refresh</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th scope="col">Received</th><th scope="col">Reference</th><th scope="col">Product</th><th scope="col">Customer</th><th scope="col">Ship to</th><th scope="col">Notes</th><th scope="col">Status</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  var NAMES = { SPH72: 'SPH72', SPH42: 'SPH42', PATCH: 'Official Pigeonnaut Patch' };
+  var STATUSES = ['new', 'contacted', 'fulfilled', 'cancelled'];
+  var orders = [];
+  var views = ['v-signin', 'v-continue', 'v-orders'];
+  function show(id) {
+    views.forEach(function (v) { document.getElementById(v).hidden = v !== id; });
+    document.getElementById('signout').hidden = id !== 'v-orders';
+  }
+  function api(path, method, body) {
+    return fetch(path, {
+      method: method || 'GET',
+      credentials: 'same-origin',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); });
+  }
+  function el(tag, text, cls) {
+    var e = document.createElement(tag);
+    if (text !== undefined && text !== null) e.textContent = String(text);
+    if (cls) e.className = cls;
+    return e;
+  }
+  function price(cents) {
+    return cents === null || cents === undefined ? 'Price on request' : '$' + (cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  function render() {
+    var filter = document.getElementById('filter').value;
+    var tbody = document.getElementById('rows');
+    tbody.textContent = '';
+    var list = orders.filter(function (o) { return filter === 'all' || o.status === filter; });
+    if (!list.length) {
+      var tr = el('tr'); var td = el('td', orders.length ? 'No requests with that status.' : 'No order requests yet.', 'empty');
+      td.colSpan = 7; tr.appendChild(td); tbody.appendChild(tr); return;
+    }
+    list.forEach(function (o) {
+      var tr = el('tr');
+      var d = new Date(o.created_at);
+      var when = el('td'); when.appendChild(el('div', d.toLocaleDateString())); when.appendChild(el('div', d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), 'sub'));
+      tr.appendChild(when);
+      tr.appendChild(el('td', o.reference, 'mono'));
+      var prod = el('td'); prod.appendChild(el('div', (NAMES[o.product] || o.product) + ' × ' + o.quantity)); prod.appendChild(el('div', price(o.unit_price_cents) + ' each', 'sub'));
+      tr.appendChild(prod);
+      var cust = el('td'); cust.appendChild(el('div', o.name));
+      var mail = el('a', o.email); mail.href = 'mailto:' + encodeURIComponent(o.email).replace(/%40/g, '@'); mail.style.color = '#F2EFE6';
+      var mailDiv = el('div', undefined, 'sub'); mailDiv.appendChild(mail); cust.appendChild(mailDiv);
+      tr.appendChild(cust);
+      var a = o.shipping_address || {};
+      var ship = el('td');
+      [a.line1, a.line2, [a.city, a.region, a.postal].filter(Boolean).join(', '), a.country].filter(Boolean).forEach(function (line, i) { ship.appendChild(el('div', line, i ? 'sub' : undefined)); });
+      tr.appendChild(ship);
+      tr.appendChild(el('td', o.notes || '', 'notes'));
+      var st = el('td');
+      var sel = el('select');
+      sel.setAttribute('aria-label', 'Status for ' + o.reference);
+      STATUSES.forEach(function (s) { var opt = el('option', s.charAt(0).toUpperCase() + s.slice(1)); opt.value = s; sel.appendChild(opt); });
+      sel.value = o.status;
+      sel.addEventListener('change', function () {
+        var prev = o.status;
+        sel.disabled = true;
+        api('/api/admin/orders', 'PATCH', { id: o.id, status: sel.value }).then(function (r) {
+          sel.disabled = false;
+          if (r.ok) { o.status = r.data.order.status; say('Updated ' + o.reference + '.'); }
+          else { sel.value = prev; say(r.data.error || 'Couldn’t update that order.'); if (r.status === 401) show('v-signin'); }
+        });
+      });
+      st.appendChild(sel);
+      tr.appendChild(st);
+      tbody.appendChild(tr);
+    });
+  }
+  function say(text) { document.getElementById('orders-msg').textContent = text; }
+  function load() {
+    say('Loading…');
+    return api('/api/admin/orders').then(function (r) {
+      if (r.status === 401) { show('v-signin'); return; }
+      if (!r.ok) { show('v-orders'); say(r.data.error || 'Couldn’t load order requests.'); return; }
+      orders = r.data.orders || [];
+      show('v-orders');
+      say(orders.length + (orders.length === 1 ? ' request' : ' requests'));
+      render();
+    });
+  }
+
+  document.getElementById('signin-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var msg = document.getElementById('signin-msg');
+    msg.textContent = 'Sending…';
+    api('/api/admin/login', 'POST', { email: document.getElementById('si-email').value }).then(function (r) {
+      msg.textContent = r.ok ? 'If that address can sign in, a link is on its way. Check your email.' : (r.data.error || 'Something went wrong.');
+    });
+  });
+
+  var params = new URLSearchParams(location.search);
+  var token = params.get('t');
+  document.getElementById('continue').addEventListener('click', function () {
+    var msg = document.getElementById('continue-msg');
+    api('/api/admin/session', 'POST', { token: token }).then(function (r) {
+      if (!r.ok) { msg.textContent = 'That sign-in link has expired or isn’t valid. Ask for a new one below.'; show('v-signin'); return; }
+      history.replaceState(null, '', location.pathname);
+      load();
+    });
+  });
+  document.getElementById('signout').addEventListener('click', function () {
+    api('/api/admin/session', 'DELETE').then(function () { orders = []; show('v-signin'); });
+  });
+  document.getElementById('filter').addEventListener('change', render);
+  document.getElementById('refresh').addEventListener('click', load);
+
+  if (token) show('v-continue');
+  else api('/api/admin/session').then(function (r) { if (r.ok) load(); else show('v-signin'); });
+})();
+</script>
+</body>
+</html>

@@ -30,6 +30,18 @@ At the top of the script, `DCLogic` sets the defaults:
 
 Every model can also be dragged to rotate.
 
+## Development and deployment
+
+See [`CLAUDE.md`](./CLAUDE.md) for commands, CI and the branch/release workflow: feature branches → `staging` (QA) → `main` (production), with the release PR opened automatically.
+
+Import this repository in Vercel (framework preset: Other; no build command). `main` deploys to production; `staging` and feature branches get preview deployments.
+
+### One-time repository setup
+
+- Make `staging` the default branch (it's the base for every PR)
+- Settings → Actions → General: allow GitHub Actions to create pull requests (for the release PR)
+- Labels: `skip-e2e`
+
 ## Not wired up yet
 
 The Place Order, Purchase, About, Contact and social links all point to `#`, so they don't go anywhere yet.
