@@ -1,0 +1,10 @@
+# Not part of the public site.
+e2e
+tests
+supabase
+.claude
+.github
+*.md
+playwright.config.mjs
+scripts/check.mjs
+scripts/dev-server.mjs
