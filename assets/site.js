@@ -246,7 +246,7 @@ class Component extends DCLogic {
         } else if (v.scene === 1 || v.scene === 2) {
           yaw = -1.0 + ta * 0.3 + v.yaw;
           pitch = 0.14 + v.pitch;
-          off = [0, (v.scene === 1 ? -0.02 : 0.12) + 0.035 * Math.sin(t * 1.1), 0];
+          off = [0, 0.12 + 0.035 * Math.sin(t * 1.1), 0];
           dist = 5.0;
           if (v.scene === 2) shell = self._lin(P.shell42 || '#5DC4A0');
         } else {
@@ -702,7 +702,7 @@ class Component extends DCLogic {
 'void main(){',
 '  vec2 uv=(gl_FragCoord.xy-0.5*uRes)/uRes.y;uv-=uShift;',
 '  vec3 ro=vec3(0.,0.,uDist);vec3 rd=normalize(vec3(uv,-1.9));',
-'  if(uScene<1.5){gSE=vec3(0.,-0.35,0.02)+SD*0.25;gR2=1.0;}',
+'  if(uScene<0.5){gSE=vec3(0.,-0.35,0.02)+SD*0.25;gR2=1.0;}',
 '  if(uScene<0.5&&uPass<0.5){vec3 bg=background(ro,rd,uv);bg=1.-exp(-bg);bg=pow(bg,vec3(0.4545));bg+=(hash12(gl_FragCoord.xy)-0.5)/255.;gl_FragColor=vec4(bg,1.);return;}',
 '  vec3 lro=toLocal(ro);vec3 lrd=toLocalDir(rd);',
 '  vec3 bc=uScene<0.5?(HH-MC)*MK:vec3(0.);float bR=uScene<0.5?0.5:(uScene<2.5?1.45:2.25);',
