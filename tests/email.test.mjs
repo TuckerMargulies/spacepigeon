@@ -38,3 +38,20 @@ test('admin sign-in email carries the link, escaped in HTML', () => {
   assert.ok(html.includes('?t=a&quot;b'));
   assert.ok(text.includes('https://spacepigeon.net/admin/?t=a"b'));
 });
+
+test('order email shows the ordered product, its specs and the contact address', () => {
+  process.env.SITE_URL = 'https://spacepigeon.net';
+  const sph72 = orderConfirmationEmail({ ...order, product: 'SPH72' }).html;
+  assert.ok(sph72.includes('https://spacepigeon.net/assets/email/sph72.jpg'));
+  assert.ok(sph72.includes('USE: INTER-PLANETARY'));
+  assert.ok(sph72.includes('mailto:admin@coalesce.nyc'));
+  assert.ok(orderConfirmationEmail({ ...order, product: 'PATCH' }).html.includes('/assets/email/patch.jpg'));
+  assert.ok(orderConfirmationEmail(order).html.includes('/assets/email/sph42.jpg'));
+  delete process.env.SITE_URL;
+});
+
+test('admin email uses the hero image and an Open admin button', () => {
+  const { html } = adminSignInEmail('https://spacepigeon.net/admin/?t=x');
+  assert.ok(html.includes('/assets/email/hero.jpg'));
+  assert.ok(html.includes('OPEN ADMIN'));
+});
