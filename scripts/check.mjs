@@ -4,7 +4,7 @@
 // - no unfilled template holes ({{ … }}) or canvas-only URLs from the design canvas export
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 
-const PAGES = ['index.html', 'admin/index.html'];
+const PAGES = ['index.html', 'about/index.html', 'admin/index.html'];
 const SCRIPTS = readdirSync('assets').filter((f) => f.endsWith('.js')).map((f) => `assets/${f}`);
 const problems = [];
 let assetCount = 0;
