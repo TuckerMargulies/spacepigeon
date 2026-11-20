@@ -2,7 +2,7 @@
 
 Premier space helmet technology for the galaxy's ultimate navigators.
 
-A one-page rebuild of spacepigeon.net with real-time 3D scenes: the pigeonnaut in the hero, the SPH72 and SPH42 helmets, and the Official Pigeonnaut Patch. Every model is drawn live in the browser with WebGL (raymarched signed distance fields). There are no 3D libraries, model files or build steps.
+A one-page rebuild of spacepigeon.net with real-time 3D scenes: the pigeonnaut in the hero, the SPH72 and SPH42 helmets, and the Official Pigeonnaut Patch. Every model is drawn live in the browser with WebGL: the pigeon is a real mesh, and the helmets and patch are raymarched signed distance fields. There are no 3D libraries, model files or build steps.
 
 ## Run it
 
@@ -18,6 +18,7 @@ Then visit http://localhost:8000. Opening the file directly from disk also works
 
 - `index.html`: markup, styles, and the WebGL renderer, all in one file.
 - `assets/patch.png`: the patch artwork, mapped onto the 3D patch.
+- `assets/pigeon-mesh.json`: the hero pigeon mesh (converted from the purchased OBJ; positions, normals and material ids, base64-packed). The plumage is painted in the mesh shader; the SPH72 helmet is raymarched and fitted to the head, with depth compositing so the shell hides the head and the glass shows the face.
 
 ## Tweaks
 

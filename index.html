@@ -250,7 +250,8 @@ class Component extends DCLogic {
     };
     var prog = gl.createProgram();
     gl.attachShader(prog, compile(gl.VERTEX_SHADER, 'attribute vec2 aPos;void main(){gl_Position=vec4(aPos,0.,1.);}'));
-    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, this._fs()));
+    var fdx = scene === 0 ? gl.getExtension('EXT_frag_depth') : null;
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, (fdx ? '#extension GL_EXT_frag_depth : enable\n#define FRAGDEPTH 1\n' : '') + this._fs()));
     gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.warn('[spacepigeon]', gl.getProgramInfoLog(prog)); return; }
     gl.useProgram(prog);
@@ -261,8 +262,9 @@ class Component extends DCLogic {
     gl.enableVertexAttribArray(al);
     gl.vertexAttribPointer(al, 2, gl.FLOAT, false, 0, 0);
     var u = {};
-    ['uRes', 'uTime', 'uScene', 'uRot', 'uOff', 'uShift', 'uDist', 'uShell', 'uAccent', 'uVisor', 'uTex', 'uTexOn'].forEach(function (n) { u[n] = gl.getUniformLocation(prog, n); });
-    var v = { scene: scene, el: el, gl: gl, u: u, yaw: 0, pitch: 0, vel: 0, drag: false, px: 0, py: 0, visible: true, texOn: 0 };
+    ['uRes', 'uTime', 'uScene', 'uRot', 'uOff', 'uShift', 'uDist', 'uShell', 'uAccent', 'uVisor', 'uTex', 'uTexOn', 'uPass'].forEach(function (n) { u[n] = gl.getUniformLocation(prog, n); });
+    var v = { scene: scene, el: el, gl: gl, u: u, yaw: 0, pitch: 0, vel: 0, drag: false, px: 0, py: 0, visible: true, texOn: 0, prog: prog, fsBuf: buf, al: al, fdx: !!fdx, mesh: null };
+    if (scene === 0) this._loadMesh(v, compile);
 
     v.tex = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
@@ -335,11 +337,11 @@ class Component extends DCLogic {
         var a = W / H;
         var yaw, pitch, off = [0, 0, 0], shift = [0, 0], dist = 5.0, shell = self._lin('#EEEDEA'), visor = self._lin('#E6EEF5');
         if (v.scene === 0) {
-          yaw = 1.25 + 0.2 * Math.sin(ta * 0.22) + v.yaw;
-          pitch = 0.05 + 0.04 * Math.sin(ta * 0.35) + v.pitch;
-          off = [0, 0.05 * Math.sin(t * 0.8), 0];
-          if (a > 1.15) { shift = [Math.min(a * 0.2, 0.5), -0.02]; dist = 5.2; }
-          else { shift = [0, -0.18]; dist = 6.8; }
+          yaw = 1.2 + 0.25 * Math.sin(ta * 0.22) + v.yaw;
+          pitch = 0.06 + 0.04 * Math.sin(ta * 0.35) + v.pitch;
+          off = [0, -0.03 + 0.05 * Math.sin(t * 0.8), 0];
+          if (a > 1.15) { shift = [Math.min(a * 0.19, 0.42), 0.0]; dist = 6.0; }
+          else { shift = [0, -0.18]; dist = 7.4; }
         } else if (v.scene === 1 || v.scene === 2) {
           yaw = -1.0 + ta * 0.3 + v.yaw;
           pitch = 0.14 + v.pitch;
@@ -354,6 +356,10 @@ class Component extends DCLogic {
           else { shift = [0, -0.5 + 240 / ch]; dist = 1.9 * ch / 195; }
         }
         var u = v.u;
+        gl.useProgram(v.prog);
+        gl.bindBuffer(gl.ARRAY_BUFFER, v.fsBuf);
+        gl.enableVertexAttribArray(v.al);
+        gl.vertexAttribPointer(v.al, 2, gl.FLOAT, false, 0, 0);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, v.tex);
         gl.uniform2f(u.uRes, W, H);
@@ -368,18 +374,173 @@ class Component extends DCLogic {
         gl.uniform3f(u.uVisor, visor[0], visor[1], visor[2]);
         gl.uniform1i(u.uTex, 0);
         gl.uniform1f(u.uTexOn, v.texOn);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if (v.scene !== 0) {
+          gl.uniform1f(u.uPass, 0);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+        } else {
+          self._drawHero(v, W, H, t, yaw, pitch, off, shift, dist);
+        }
       }
       self._raf = requestAnimationFrame(tick);
     };
     if (!this._raf) this._raf = requestAnimationFrame(tick);
   }
 
+  _loadMesh(v, compile) {
+    var gl = v.gl;
+    var vs = compile(gl.VERTEX_SHADER, this._meshVs());
+    var fs = compile(gl.FRAGMENT_SHADER, this._meshFs());
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.warn('[spacepigeon] mesh', gl.getProgramInfoLog(prog)); return; }
+    var dec = function (str) { var bin = atob(str); var arr = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return arr; };
+    fetch('assets/pigeon-mesh.json').then(function (r) { return r.json(); }).then(function (d) {
+      var vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, dec(d.vb), gl.STATIC_DRAW);
+      var ibo = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, dec(d.ib), gl.STATIC_DRAW);
+      var u = {};
+      ['uRes', 'uRot', 'uOff', 'uShift', 'uDist', 'uTime'].forEach(function (n) { u[n] = gl.getUniformLocation(prog, n); });
+      v.mesh = { prog: prog, vbo: vbo, ibo: ibo, count: d.tris * 3, u: u,
+        aP: gl.getAttribLocation(prog, 'aPos'), aN: gl.getAttribLocation(prog, 'aNor'), aM: gl.getAttribLocation(prog, 'aMat') };
+    }).catch(function (e) { console.warn('[spacepigeon] mesh load', e); });
+  }
+
+  _drawHero(v, W, H, t, yaw, pitch, off, shift, dist) {
+    var gl = v.gl, u = v.u;
+    gl.disable(gl.BLEND);
+    gl.disable(gl.DEPTH_TEST);
+    gl.depthMask(true);
+    gl.clearDepth(1);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.uniform1f(u.uPass, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (v.mesh) {
+      var M = v.mesh;
+      gl.enable(gl.DEPTH_TEST);
+      gl.depthFunc(gl.LESS);
+      gl.useProgram(M.prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, M.vbo);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, M.ibo);
+      gl.enableVertexAttribArray(M.aP); gl.vertexAttribPointer(M.aP, 3, gl.FLOAT, false, 16, 0);
+      gl.enableVertexAttribArray(M.aN); gl.vertexAttribPointer(M.aN, 3, gl.BYTE, true, 16, 12);
+      gl.enableVertexAttribArray(M.aM); gl.vertexAttribPointer(M.aM, 1, gl.UNSIGNED_BYTE, false, 16, 15);
+      gl.uniform2f(M.u.uRes, W, H);
+      gl.uniform2f(M.u.uRot, yaw, pitch);
+      gl.uniform3f(M.u.uOff, off[0], off[1], off[2]);
+      gl.uniform2f(M.u.uShift, shift[0], shift[1]);
+      gl.uniform1f(M.u.uDist, dist);
+      gl.uniform1f(M.u.uTime, t);
+      gl.drawElements(gl.TRIANGLES, M.count, gl.UNSIGNED_SHORT, 0);
+      [M.aP, M.aN, M.aM].forEach(function (l) { if (l >= 0 && l !== v.al) gl.disableVertexAttribArray(l); });
+      gl.useProgram(v.prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, v.fsBuf);
+      gl.enableVertexAttribArray(v.al);
+      gl.vertexAttribPointer(v.al, 2, gl.FLOAT, false, 0, 0);
+    }
+    if (v.fdx) { gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); } else { gl.disable(gl.DEPTH_TEST); }
+    gl.uniform1f(u.uPass, 1);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
+    gl.uniform1f(u.uPass, 2);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.disable(gl.BLEND);
+    gl.depthMask(true);
+    gl.disable(gl.DEPTH_TEST);
+  }
+
+  _meshVs() {
+    return [
+'attribute vec3 aPos;attribute vec3 aNor;attribute float aMat;',
+'uniform vec2 uRes;uniform vec2 uRot;uniform vec3 uOff;uniform vec2 uShift;uniform float uDist;',
+'varying vec3 vM;varying vec3 vN;varying vec3 vW;varying float vMat;',
+'mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}',
+'vec3 toWorldDir(vec3 d){d.yz=rot(-uRot.y)*d.yz;d.xz=rot(-uRot.x)*d.xz;return d;}',
+'void main(){vM=aPos;vMat=aMat;vec3 l=(aPos-vec3(0.532,1.05,-0.55))*0.33333;vec3 w=toWorldDir(l)+uOff;vW=w;vN=toWorldDir(aNor);',
+'  vec3 c=w-vec3(0.,0.,uDist);float W=-c.z;vec2 uv=c.xy*1.9/W+uShift;float n=0.1,f=50.;',
+'  gl_Position=vec4(uv.x*2.*uRes.y/uRes.x*W,uv.y*2.*W,(f+n)/(n-f)*c.z+2.*f*n/(n-f),W);}'
+    ].join('\n');
+  }
+
+  /* Plumage painted onto the model by region, after the reference: grey head, iridescent green neck,
+     mauve chest, checkered wings, dark flight and tail feathers, coral banded legs, orange eyes. */
+  _meshFs() {
+    return [
+'precision highp float;',
+'varying vec3 vM;varying vec3 vN;varying vec3 vW;varying float vMat;',
+'uniform float uDist;uniform float uTime;',
+'vec3 lin(vec3 c){return pow(c,vec3(2.2));}',
+'float hash13(vec3 p3){p3=fract(p3*0.1031);p3+=dot(p3,p3.zyx+31.32);return fract((p3.x+p3.y)*p3.z);}',
+'float hash12(vec2 p){vec3 p3=fract(vec3(p.xyx)*0.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}',
+'float vnoise(vec3 x){vec3 i=floor(x);vec3 f=fract(x);f=f*f*(3.-2.*f);',
+'  return mix(mix(mix(hash13(i),hash13(i+vec3(1.,0.,0.)),f.x),mix(hash13(i+vec3(0.,1.,0.)),hash13(i+vec3(1.,1.,0.)),f.x),f.y),',
+'             mix(mix(hash13(i+vec3(0.,0.,1.)),hash13(i+vec3(1.,0.,1.)),f.x),mix(hash13(i+vec3(0.,1.,1.)),hash13(i+vec3(1.,1.,1.)),f.x),f.y),f.z);}',
+'vec3 env(vec3 d){',
+'  vec3 c=mix(vec3(0.004,0.005,0.012),vec3(0.03,0.04,0.09),smoothstep(-0.4,0.8,d.y));',
+'  c+=vec3(1.,0.97,0.92)*1.8*smoothstep(0.72,0.95,d.y)*smoothstep(0.9,0.15,abs(d.x));',
+'  vec3 L=normalize(vec3(-0.6,0.55,0.6));c+=vec3(1.,0.85,0.7)*pow(max(dot(d,L),0.),60.)*3.;',
+'  c+=vec3(0.3,0.65,0.95)*0.9*smoothstep(0.82,0.98,dot(d,normalize(vec3(1.,0.2,-0.6))));',
+'  return c;}',
+'void main(){',
+'  vec3 n=normalize(vN);vec3 rd=normalize(vW-vec3(0.,0.,uDist));if(dot(n,rd)>0.)n=-n;',
+'  vec3 m=vM;float g=vnoise(m*vec3(40.,40.,14.));float nz=vnoise(m*4.);float cs=max(dot(n,-rd),0.);',
+'  vec3 alb=lin(vec3(0.5,0.52,0.56));float spec=0.12;float shin=18.;float wrap=0.4;float sheen=0.3;float refl=0.03;',
+'  if(vMat>1.5){',
+'    alb=lin(vec3(0.2,0.21,0.24))*(0.8+0.3*g);alb=mix(alb,lin(vec3(0.06,0.06,0.07)),smoothstep(-3.0,-3.35,m.z));spec=0.25;sheen=0.35;',
+'  }else{',
+'    alb=mix(alb,lin(vec3(0.6,0.62,0.66)),smoothstep(0.75,0.2,m.y)*smoothstep(-0.5,0.5,m.z));',
+'    float head=smoothstep(2.62,2.78,m.y);',
+'    float grn=smoothstep(1.85,2.15,m.y)*(1.-head);',
+'    float mauve=smoothstep(1.15,1.45,m.y)*smoothstep(2.1,1.85,m.y)*smoothstep(0.9,1.35,m.z);',
+'    float wing=smoothstep(1.25,1.05,m.z)*smoothstep(0.58,0.8,m.y+0.05*m.z)*(1.-smoothstep(1.95,2.15,m.y))*(1.-mauve);',
+'    vec2 fu=vec2(m.z*4.2,(m.y+0.3*m.z)*5.2);float row=floor(fu.y);fu.x+=0.5*row;vec2 cell=floor(fu);vec2 f=fract(fu);',
+'    vec2 side=m.x>0.532?vec2(0.):vec2(19.,7.);float hsh=hash12(cell+side);float h2=hash12(cell*1.7+side+3.1);',
+'    vec2 cq=f-vec2(0.5,0.32);float tipS=abs(cq.x)*1.1+cq.y*0.8;',
+'    float mot=0.6*vnoise(m*vec3(6.,8.,5.)+side.xyx)+0.4*vnoise(m*vec3(17.,21.,14.));',
+'    float mark=smoothstep(0.5,0.68,mot+0.12*smoothstep(0.45,0.15,tipS)*step(0.3,hsh)-0.08*h2);',
+'    float edge=smoothstep(0.32,0.5,abs(f.x-0.5)+0.55*(1.-f.y));',
+'    vec3 wc=lin(vec3(0.52,0.54,0.59));wc=mix(wc,lin(vec3(0.11,0.11,0.13))*(0.8+0.4*g),mark*0.92);wc*=0.82+0.24*edge;',
+'    wc=mix(wc,lin(vec3(0.17,0.18,0.21)),smoothstep(-1.5,-1.9,m.z));',
+'    alb=mix(alb,wc,wing);',
+'    vec3 iri=mix(lin(vec3(0.2,0.6,0.46)),lin(vec3(0.36,0.72,0.55)),0.5+0.5*sin(cs*5.+m.x*6.+m.y*5.));',
+'    iri=mix(iri,lin(vec3(0.45,0.36,0.6)),smoothstep(0.55,0.15,cs)*0.4);',
+'    alb=mix(alb,iri,grn);',
+'    alb=mix(alb,mix(lin(vec3(0.5,0.38,0.5)),lin(vec3(0.42,0.4,0.55)),1.-cs),mauve*0.85);',
+'    alb=mix(alb,lin(vec3(0.55,0.58,0.63)),head);',
+'    alb*=0.84+0.24*g;alb*=0.94+0.1*nz;',
+'    spec=0.1+0.55*max(grn,mauve*0.6);shin=18.+30.*grn;sheen=0.3+0.3*grn;',
+'    if(m.y<-0.08&&m.z>-0.45&&m.z<1.05){float lg=smoothstep(-0.1,-0.22,m.y);vec3 lc=lin(vec3(0.86,0.38,0.38));',
+'      float sc=smoothstep(0.6,0.95,sin(m.y*95.+m.z*25.));lc=mix(lc,lin(vec3(0.95,0.78,0.76)),sc*0.3);',
+'      if(m.y<-1.0&&(m.z>0.86||m.z<-0.2))lc=vec3(0.01);',
+'      alb=mix(alb,lc,lg);spec=mix(spec,0.4,lg);wrap=mix(wrap,0.2,lg);sheen=mix(sheen,0.,lg);}',
+'    if(m.z>2.15&&m.y<2.8&&m.y>2.3){float bk=smoothstep(2.15,2.22,m.z);alb=mix(alb,lin(vec3(0.17,0.17,0.19)),bk);spec=0.5;shin=50.;',
+'      float ce=1.-smoothstep(0.06,0.1,length((m-vec3(0.532,2.7,2.24))*vec3(1.,1.4,1.)));alb=mix(alb,lin(vec3(0.9,0.89,0.86))*(0.9+0.1*g),ce);}',
+'  }',
+'  vec3 ec=vec3(m.x<0.532?0.28:0.784,2.885,2.019);float er=length((m-ec).yz);float ex=abs(m.x-ec.x);',
+'  if(vMat>0.5&&vMat<1.5||(ex<0.1&&er<0.12)){vec3 ic=lin(vec3(0.93,0.45,0.1));ic=mix(ic,vec3(0.01),smoothstep(0.052,0.04,er));',
+'    ic=mix(lin(vec3(0.6,0.62,0.66)),ic,smoothstep(0.115,0.098,er));alb=ic;spec=1.2;shin=160.;wrap=0.1;sheen=0.;refl=0.2;}',
+'  vec3 L1=normalize(vec3(-0.6,0.55,0.6));vec3 L2=normalize(vec3(0.9,0.3,-0.6));',
+'  float nl=dot(n,L1);float dif=clamp((nl+wrap)/(1.+wrap),0.,1.);float rim=max(dot(n,L2),0.);float amb=0.5+0.5*n.y;',
+'  vec3 H=normalize(L1-rd);float sp=pow(max(dot(n,H),0.),shin)*spec*(shin+8.)/40.;',
+'  float ao=0.6+0.4*smoothstep(-1.1,0.3,m.y);',
+'  vec3 c=alb*(dif*lin(vec3(1.,0.94,0.87))*1.5+rim*lin(vec3(0.45,0.7,1.))*0.9+amb*vec3(0.06,0.07,0.11))*ao;',
+'  c+=sp*vec3(1.,0.95,0.9)*max(nl,0.);c+=env(reflect(rd,n))*(refl+pow(1.-cs,5.)*0.2);',
+'  c+=lin(vec3(0.6,0.7,0.9))*sheen*pow(1.-cs,3.)*0.4;',
+'  c=1.-exp(-c);c=pow(c,vec3(0.4545));',
+'  c+=(hash12(gl_FragCoord.xy)-0.5)/255.;',
+'  gl_FragColor=vec4(c,1.);}'
+    ].join('\n');
+  }
+
   _fs() {
     return [
 'precision highp float;',
 'uniform vec2 uRes;uniform float uTime;uniform float uScene;uniform vec2 uRot;uniform vec3 uOff;uniform vec2 uShift;uniform float uDist;',
-'uniform vec3 uShell;uniform vec3 uAccent;uniform vec3 uVisor;uniform sampler2D uTex;uniform float uTexOn;',
+'uniform vec3 uShell;uniform vec3 uAccent;uniform vec3 uVisor;uniform sampler2D uTex;uniform float uTexOn;uniform float uPass;',
 'float gMat;vec3 gHP;',
 'mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}',
 'vec3 lin(vec3 c){return pow(c,vec3(2.2));}',
@@ -400,13 +561,13 @@ class Component extends DCLogic {
 'vec3 toLocalDir(vec3 d){d.xz=rot(uRot.x)*d.xz;d.yz=rot(uRot.y)*d.yz;return d;}',
 'vec3 toWorldDir(vec3 d){d.yz=rot(-uRot.y)*d.yz;d.xz=rot(-uRot.x)*d.xz;return d;}',
 'float hv(vec3 p){return p.z-0.28+0.2*p.y+0.25*p.x*p.x;}',
-'const vec3 SD=vec3(0.,-0.947,-0.322);const vec3 SE=vec3(0.,-0.97,-0.19);',
+'const vec3 SD=vec3(0.,-0.947,-0.322);const vec3 SE=vec3(0.,-0.97,-0.19);vec3 gSE=vec3(0.,-0.97,-0.19);float gR2=0.68;',
 
 /* ---------- helmet: unit scale, head at origin, facing +z; shell runs down the neck as a collar ---------- */
 'float hOuter(vec3 p){',
 '  float dome=sdEll(p-vec3(0.,0.06,-0.02),vec3(0.74,0.78,0.8));',
 '  float nose=sdRoundCone(p,vec3(0.,0.,0.12),vec3(0.,-0.12,0.66),0.62,0.34);',
-'  float sleeve=sdRoundCone(p,vec3(0.,-0.35,0.02),SE,0.6,0.68);',
+'  float sleeve=sdRoundCone(p,vec3(0.,-0.35,0.02),gSE,0.6,gR2);',
 '  return smin(smin(dome,nose,0.25),sleeve,0.2);}',
 'float helmet(vec3 p,float variant){',
 '  gHP=p;vec3 q=vec3(abs(p.x),p.y,p.z);',
@@ -419,14 +580,14 @@ class Component extends DCLogic {
 '  sh=max(sh,-slots);',
 '  float grille=1e3;for(int i=0;i<4;i++){float x=-0.09+0.06*float(i);grille=min(grille,sdCap(p,vec3(x,-0.1,-0.8),vec3(x,-0.3,-0.74),0.016));}',
 '  sh=max(sh,-grille);',
-'  sh=max(sh,dot(p-SE,SD));',
+'  sh=max(sh,dot(p-gSE,SD));',
 '  float d=sh;gMat=abs(v)<0.065?6.:1.;if(o<-0.02)gMat=7.;',
 '  float boss=sdCap(q,vec3(0.58,-0.1,0.18),vec3(0.72,-0.1,0.18),0.08);if(boss<d){d=boss;gMat=3.;}',
 '  float pin=sdCap(q,vec3(0.72,-0.1,0.18),vec3(0.755,-0.1,0.18),0.033);if(pin<d){d=pin;gMat=6.;}',
-'  vec3 pr=p-SE;float al=dot(pr,SD);vec3 rv=pr-SD*al;float rad=length(rv);',
-'  float ring=length(vec2(rad-0.66,al+0.02))-0.045;if(ring<d){d=ring;gMat=3.;}',
+'  vec3 pr=p-gSE;float al=dot(pr,SD);vec3 rv=pr-SD*al;float rad=length(rv);',
+'  float ring=length(vec2(rad-(gR2-0.02),al+0.02))-0.045;if(ring<d){d=ring;gMat=3.;}',
 '  float x1=rv.x;float x2=dot(rv,vec3(0.,-0.322,0.947));float ang=atan(x2,x1);float sec=0.785398;ang=mod(ang+sec*0.5,sec)-sec*0.5;vec2 lp=rad*vec2(cos(ang),sin(ang));',
-'  float tab=sdRBox(vec3(lp.x-0.7,al+0.02,lp.y),vec3(0.035,0.03,0.025),0.006);if(tab<d){d=tab;gMat=6.;}',
+'  float tab=sdRBox(vec3(lp.x-(gR2+0.02),al+0.02,lp.y),vec3(0.035,0.03,0.025),0.006);if(tab<d){d=tab;gMat=6.;}',
 '  float led=sdCap(p,vec3(-0.14,0.12,-0.81),vec3(0.14,0.12,-0.81),0.018);if(led<d){d=led;gMat=8.;}',
 '  if(variant>1.5){',
 '    float pod=sdCap(q,vec3(0.52,0.46,-0.36),vec3(0.5,0.46,-0.02),0.06);if(pod<d){d=pod;gMat=3.;}',
@@ -437,50 +598,17 @@ class Component extends DCLogic {
 'float glassH(vec3 p){float o=hOuter(p);return max(abs(o+0.016)-0.006,0.03-hv(p));}',
 
 /* ---------- pigeon: rock dove after the original illustration, facing +z ---------- */
-'const vec3 PC=vec3(0.,0.19,0.);',
-'float mapPigeon(vec3 p){',
-'  p+=PC;vec3 q=vec3(abs(p.x),p.y,p.z);',
-'  vec3 bp=p-vec3(0.,0.12,0.04);bp.yz=rot(-0.55)*bp.yz;',
-'  float body=sdEll(bp,vec3(0.3,0.31,0.56));',
-'  float chest=length(p-vec3(0.,0.16,0.32))-0.35;',
-'  float belly=sdEll(p-vec3(0.,-0.08,0.08),vec3(0.27,0.22,0.32));',
-'  float d=smin(smin(body,chest,0.2),belly,0.15);',
-'  float neck=sdRoundCone(p,vec3(0.,0.25,0.36),vec3(0.,0.68,0.52),0.27,0.14);d=smin(d,neck,0.16);',
-'  float thigh=sdEll(q-vec3(0.1,-0.22,0.02),vec3(0.09,0.12,0.11));d=smin(d,thigh,0.06);',
-'  float s=0.33;vec3 hq=p-vec3(0.,0.82,0.57);hq.yz=rot(0.1)*hq.yz;hq/=s;',
-'  float head=sdEll(hq-vec3(0.,0.02,0.18),vec3(0.4,0.46,0.5))*s;d=smin(d,head,0.03);',
-'  gMat=10.;',
-'  vec3 wq=q-vec3(0.22,0.12,-0.14);wq.yz=rot(-0.5)*wq.yz;wq.xz=rot(0.07)*wq.xz;float wing=sdEll(wq,vec3(0.11,0.26,0.55));',
-'  float d2=smin(d,wing,0.04);if(wing<d)gMat=11.;d=d2;',
-'  float pf=1e3;for(int i=0;i<5;i++){float fi=float(i);vec3 fp=q-vec3(0.15-0.017*fi,-0.04-0.026*fi,-0.55-0.045*fi);fp.yz=rot(-0.35)*fp.yz;fp.xz=rot(0.09)*fp.xz;pf=min(pf,sdEll(fp,vec3(0.055,0.016,0.38-0.025*fi)));}',
-'  if(pf<d){d=pf;gMat=17.;}',
-'  vec3 tp=p-vec3(0.,-0.1,-0.55);tp.yz=rot(-0.28)*tp.yz;',
-'  float tl=1e3;for(int i=0;i<5;i++){float fi=float(i);vec3 fp=tp;fp.xz=rot((fi-2.)*0.08)*fp.xz;fp-=vec3(0.,-0.008*abs(fi-2.),-0.28);tl=min(tl,sdEll(fp,vec3(0.06,0.014,0.32)));}',
-'  if(tl<d){d=tl;gMat=18.;}',
-'  float leg=sdCap(q,vec3(0.1,-0.3,0.02),vec3(0.11,-0.53,0.04),0.026);',
-'  vec3 ft=vec3(0.11,-0.545,0.05);',
-'  leg=min(leg,sdCap(q,ft,vec3(0.04,-0.585,0.25),0.016));',
-'  leg=min(leg,sdCap(q,ft,vec3(0.11,-0.59,0.29),0.017));',
-'  leg=min(leg,sdCap(q,ft,vec3(0.19,-0.585,0.23),0.016));',
-'  leg=min(leg,sdCap(q,ft,vec3(0.11,-0.58,-0.1),0.014));',
-'  if(leg<d){d=leg;gMat=16.;}',
-'  float cl=min(min(sdCap(q,vec3(0.04,-0.585,0.25),vec3(0.03,-0.6,0.29),0.009),sdCap(q,vec3(0.11,-0.59,0.29),vec3(0.11,-0.605,0.335),0.01)),',
-'    min(sdCap(q,vec3(0.19,-0.585,0.23),vec3(0.21,-0.6,0.27),0.009),sdCap(q,vec3(0.11,-0.58,-0.1),vec3(0.11,-0.595,-0.14),0.008)));',
-'  if(cl<d){d=cl;gMat=19.;}',
-'  vec3 hq2=vec3(abs(hq.x),hq.y,hq.z);',
-'  float ering=(length(hq2-vec3(0.3,0.12,0.42))-0.1)*s;if(ering<d){d=ering;gMat=21.;}',
-'  float eye=(length(hq2-vec3(0.315,0.125,0.445))-0.085)*s;if(eye<d){d=eye;gMat=14.;}',
-'  float pup=(length(hq2-vec3(0.35,0.13,0.49))-0.045)*s;if(pup<d){d=pup;gMat=15.;}',
-'  float bk=sdRoundCone(hq,vec3(0.,-0.02,0.6),vec3(0.,-0.14,0.93),0.09,0.03)*s;if(bk<d){d=bk;gMat=12.;}',
-'  float ce=(length(hq-vec3(0.,0.06,0.63))-0.08)*s;if(ce<d){d=ce;gMat=13.;}',
-'  float pm=gMat;float hm=helmet(hq,1.)*s;float hmat=gMat;if(hm<d){d=hm;gMat=hmat;}else{gMat=pm;}',
-'  return d;}',
+/* ---------- hero: helmet fitted to the pigeon mesh (model units), mesh drawn separately ---------- */
+'const vec3 HH=vec3(0.532,2.62,1.74);const vec3 MC=vec3(0.532,1.05,-0.55);const float MK=0.33333;const float HS=0.92;',
+'vec3 heroL(vec3 p){vec3 m=p/MK+MC-HH;m.yz=rot(-0.1)*m.yz;return m/HS;}',
+'float heroH(vec3 p){return helmet(heroL(p),1.)*HS*MK;}',
+'float heroG(vec3 p){return glassH(heroL(p))*HS*MK;}',
 
 /* ---------- patch ---------- */
 'float mapPatch(vec3 p){gMat=20.;gHP=p;return extrude(p.z,length(p.xy)-0.96,0.03)-0.035;}',
 
-'float map(vec3 p){if(uScene<0.5)return mapPigeon(p);if(uScene<2.5)return helmet(p,uScene<1.5?1.:2.);return mapPatch(p);}',
-'float mapGlass(vec3 p){if(uScene<0.5){p+=PC;float s=0.33;vec3 hq=p-vec3(0.,0.82,0.57);hq.yz=rot(0.1)*hq.yz;return glassH(hq/s)*s;}return glassH(p);}',
+'float map(vec3 p){if(uScene<0.5)return heroH(p);if(uScene<2.5)return helmet(p,uScene<1.5?1.:2.);return mapPatch(p);}',
+'float mapGlass(vec3 p){if(uScene<0.5)return heroG(p);return glassH(p);}',
 'float softShadow(vec3 ro,vec3 rd){float res=1.;float t=0.02;for(int i=0;i<32;i++){float h=map(ro+rd*t);res=min(res,8.*h/t);t+=clamp(h,0.015,0.2);if(res<0.01||t>3.)break;}return clamp(res,0.,1.);}',
 'vec3 calcN(vec3 p){vec2 e=vec2(0.0012,-0.0012);return normalize(e.xyy*map(p+e.xyy)+e.yyx*map(p+e.yyx)+e.yxy*map(p+e.yxy)+e.xxx*map(p+e.xxx));}',
 'vec3 calcNG(vec3 p){vec2 e=vec2(0.001,-0.001);return normalize(e.xyy*mapGlass(p+e.xyy)+e.yyx*mapGlass(p+e.yyx)+e.yxy*mapGlass(p+e.yxy)+e.xxx*mapGlass(p+e.xxx));}',
@@ -525,7 +653,7 @@ class Component extends DCLogic {
 '  vec3 L1=normalize(vec3(-0.6,0.55,0.6));vec3 L2=normalize(vec3(0.9,0.3,-0.6));',
 '  vec3 alb=vec3(0.5);float spec=0.25;float shin=24.;float refl=0.04;vec3 emi=vec3(0.);float wrap=0.;float sheen=0.;',
 '  float fres=pow(1.-max(dot(n,-rd),0.),5.);vec3 R=reflect(rd,n);',
-'  vec3 hp=gHP;float v=hv(hp);bool base=dot(hp-SE,SD)>-0.012&&(m<1.5||(m>5.5&&m<6.5));',
+'  vec3 hp=gHP;float v=hv(hp);bool base=dot(hp-gSE,SD)>-0.012&&(m<1.5||(m>5.5&&m<6.5));',
 '  if(m<1.5){alb=uShell;spec=0.55;shin=60.;refl=0.12;',
 '    vec3 sc=uScene<1.5?uAccent:lin(vec3(0.97,0.97,0.95));',
 '    if(abs(hp.x)<0.1&&hp.y>0.22&&v<-0.07)alb=sc;',
@@ -583,19 +711,42 @@ class Component extends DCLogic {
 '  c+=lin(vec3(0.6,0.7,0.9))*sheen*pow(1.-max(dot(n,-rd),0.),3.)*0.4;',
 '  return c;}',
 
+'vec3 toWorld(vec3 p){return toWorldDir(p)+uOff;}',
+'float fdepth(vec3 lp){vec3 c=toWorld(lp)-vec3(0.,0.,uDist);float n=0.1,f=50.;float zc=(f+n)/(n-f)*c.z+2.*f*n/(n-f);return clamp((zc/(-c.z))*0.5+0.5,0.,1.);}',
 'void main(){',
 '  vec2 uv=(gl_FragCoord.xy-0.5*uRes)/uRes.y;uv-=uShift;',
 '  vec3 ro=vec3(0.,0.,uDist);vec3 rd=normalize(vec3(uv,-1.9));',
-'  vec3 col=background(ro,rd,uv);',
+'  if(uScene<0.5){gSE=vec3(0.,-0.35,0.02)+SD*0.25;gR2=1.0;}',
+'  if(uScene<0.5&&uPass<0.5){vec3 bg=background(ro,rd,uv);bg=1.-exp(-bg);bg=pow(bg,vec3(0.4545));bg+=(hash12(gl_FragCoord.xy)-0.5)/255.;gl_FragColor=vec4(bg,1.);return;}',
 '  vec3 lro=toLocal(ro);vec3 lrd=toLocalDir(rd);',
-'  float bR=uScene<0.5?1.45:(uScene<2.5?1.45:1.1);',
-'  float b=dot(lro,lrd);float c=dot(lro,lro)-bR*bR;float h=b*b-c;float tHit=1e9;float t0=0.;float tmax=0.;',
-'  if(h>0.){float sh=sqrt(h);t0=max(-b-sh,0.);tmax=-b+sh;float t=t0;',
+'  vec3 bc=uScene<0.5?(HH-MC)*MK:vec3(0.);float bR=uScene<0.5?0.5:(uScene<2.5?1.45:1.1);',
+'  vec3 oc=lro-bc;float b=dot(oc,lrd);float c=dot(oc,oc)-bR*bR;float h=b*b-c;float t0=0.;float tmax=0.;float tHit=1e9;',
+'  if(h>0.){float sh=sqrt(h);t0=max(-b-sh,0.);tmax=-b+sh;}',
+'  if(uScene<0.5&&uPass>1.5){',
+'    if(h<=0.)discard;float t=t0;float tg=1e9;',
+'    for(int i=0;i<90;i++){vec3 p=lro+lrd*t;float d=mapGlass(p);if(d<0.0004*t){tg=t;break;}t+=d*0.9;if(t>tmax)break;}',
+'    if(tg>1e8)discard;vec3 p=lro+lrd*tg;vec3 n=toWorldDir(calcNG(p));if(dot(n,rd)>0.)n=-n;',
+'    float cs=max(dot(n,-rd),0.);float fr=0.06+0.94*pow(1.-cs,5.);vec3 R=reflect(rd,n);',
+'    vec3 g=env(R)*fr*1.1+pow(max(dot(R,normalize(vec3(-0.6,0.55,0.6))),0.),260.)*vec3(5.)+lin(vec3(0.55,0.75,1.))*0.03*pow(1.-cs,2.);',
+'    g=1.-exp(-g);g=pow(g,vec3(0.4545));',
+'    gl_FragColor=vec4(g,clamp(fr,0.,1.));',
+'#ifdef FRAGDEPTH',
+'    gl_FragDepthEXT=fdepth(p);',
+'#endif',
+'    return;}',
+'  if(h>0.){float t=t0;',
 '    for(int i=0;i<130;i++){vec3 p=lro+lrd*t;float d=map(p);if(d<0.0007*t){tHit=t;break;}t+=d*0.8;if(t>tmax)break;}}',
-'  if(tHit<1e8){vec3 p=lro+lrd*tHit;vec3 nl=calcN(p);float ao=calcAO(p,nl);float shd=1.;',
-'    if(uScene<0.5)shd=softShadow(p+nl*0.01,toLocalDir(normalize(vec3(-0.6,0.55,0.6))));',
-'    map(p);float m=gMat;vec3 pl=uScene<0.5?p+PC:p;',
-'    col=shade(pl,toWorldDir(nl),rd,m,ao,shd);}',
+'  if(uScene<0.5){',
+'    if(tHit>1e8)discard;vec3 p=lro+lrd*tHit;vec3 nl=calcN(p);float ao=calcAO(p,nl);map(p);',
+'    vec3 hc=shade(p,toWorldDir(nl),rd,gMat,ao,1.);hc=1.-exp(-hc);hc=pow(hc,vec3(0.4545));',
+'    gl_FragColor=vec4(hc,1.);',
+'#ifdef FRAGDEPTH',
+'    gl_FragDepthEXT=fdepth(p);',
+'#endif',
+'    return;}',
+'  vec3 col=background(ro,rd,uv);',
+'  if(tHit<1e8){vec3 p=lro+lrd*tHit;vec3 nl=calcN(p);float ao=calcAO(p,nl);map(p);float m=gMat;',
+'    col=shade(p,toWorldDir(nl),rd,m,ao,1.);}',
 '  if(h>0.&&uScene<2.5){float t=t0;float tg=1e9;float lim=min(tmax,tHit);',
 '    for(int i=0;i<90;i++){vec3 p=lro+lrd*t;float d=mapGlass(p);if(d<0.0005*t){tg=t;break;}t+=d*0.9;if(t>lim)break;}',
 '    if(tg<tHit){vec3 p=lro+lrd*tg;vec3 n=toWorldDir(calcNG(p));if(dot(n,rd)>0.)n=-n;',
