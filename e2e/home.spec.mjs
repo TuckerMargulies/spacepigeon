@@ -39,3 +39,12 @@ test('3D assets are served', async ({ request }) => {
   const mesh = await (await request.get('/assets/pigeon-mesh.json')).json();
   expect(mesh.tris).toBeGreaterThan(1000);
 });
+
+test('contact shows the inquiries address on both pages', async ({ page }) => {
+  for (const path of ['/', '/about/']) {
+    await page.goto(path);
+    const link = page.locator('#contact a');
+    await expect(link).toHaveText('admin@coalesce.nyc');
+    await expect(link).toHaveAttribute('href', 'mailto:admin@coalesce.nyc');
+  }
+});
