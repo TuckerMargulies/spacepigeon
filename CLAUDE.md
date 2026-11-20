@@ -5,13 +5,14 @@ spacepigeon.net — a one-page site for a tongue-in-cheek space-helmet campaign,
 ## Commands
 
 ```bash
-npm run dev           # Serve the site at http://localhost:8000
+npm run dev           # Site + API functions at http://localhost:8000 (reads .env.local)
 npm run lint          # Static checks: inline script parses, assets exist, no template holes
+npm test              # Unit tests (node:test, tests/)
 npm run test:e2e      # E2E tests (Playwright, headless, software WebGL)
 npm run test:e2e:ui   # E2E tests (Playwright, interactive UI)
 ```
 
-Always run `npm run lint` before committing and `npm run test:e2e` before pushing.
+Always run `npm run lint` and `npm test` before committing and `npm run test:e2e` before pushing.
 
 ## Stack
 
@@ -19,21 +20,35 @@ Always run `npm run lint` before committing and `npm run test:e2e` before pushin
 |-------|-----------|
 | Page | One static `index.html` (markup, styles, script); no build step |
 | 3D | Raw WebGL 1: the hero pigeon is a mesh (`assets/pigeon-mesh.json`); helmets and patch are raymarched signed distance fields |
-| Deployment | Vercel (static, no framework) |
+| API | Vercel Node functions in `api/` (no dependencies; `fetch` to Supabase REST and Resend) |
+| Data | Supabase Postgres: `order_requests` (RLS on, no client access; server writes with the service-role key) |
+| Email | Resend (`resend_key`): order confirmations (admin on CC) and admin sign-in links |
+| Deployment | Vercel (static + functions, no framework) |
+| Unit Tests | node:test |
 | E2E Tests | Playwright |
 
 ## Project structure
 
 ```
-index.html                 # The whole site
+index.html                 # The whole site (+ the order request dialog)
+admin/index.html           # Light admin: order requests list + status (email-link sign-in)
+api/order-request.js       # POST: file an order request, email confirmation (CC admin)
+api/admin/                 # login (email a link), session (link → cookie), orders (list, set status)
+api/_lib/                  # Shared: validation (orders.js), db.js (only Supabase caller), email.js, tokens.js, env.js
+supabase/migrations/       # SQL for order_requests
+assets/order.js            # Order request dialog
 assets/patch.png           # Patch artwork, mapped onto the 3D patch
 assets/pigeon-mesh.json    # Hero pigeon: packed positions, normals, material ids (from the purchased OBJ)
-e2e/                       # Playwright tests
+e2e/                       # Playwright tests (support/stub-services.mjs stands in for Supabase + Resend)
+tests/                     # Unit tests
+scripts/dev-server.mjs     # npm run dev
 scripts/check.mjs          # npm run lint
 scripts/vercel-ignore-build.sh
 ```
 
-The design source is the Claude Design canvas "Space Pigeon — 3D Rebuild". `index.html` is exported from it; keep the two in step.
+The design source is the Claude Design canvas "Space Pigeon — 3D Rebuild". `index.html`'s 3D script and markup are exported from it; the order dialog and `data-order` buttons live only here — keep them when re-exporting.
+
+Order requests, admin and email rules: `.claude/rules/orders.md`. Env vars: `.env.example`.
 
 ## Code conventions
 
@@ -46,7 +61,7 @@ Every change that touches `index.html` or `assets/` updates or adds an E2E test 
 
 ## CI
 
-CI runs on every PR to `staging` or `main`: `lint`, then `e2e`.
+CI runs on every PR to `staging` or `main`: `lint` and `unit-tests`, then `e2e`.
 
 - E2E runs by default on every PR to `staging` (skipped on the release PR to `main` — already tested on staging)
 - Add the **`skip-e2e`** label only for docs-only, config/chore, or dependency-only PRs
@@ -55,7 +70,10 @@ CI runs on every PR to `staging` or `main`: `lint`, then `e2e`.
 ## Deployment (Vercel)
 
 - Vercel's Git integration deploys `main` to production and every other branch (incl. `staging`) as a preview
-- `vercel.json` sets `ignoreCommand` → `scripts/vercel-ignore-build.sh`: skips builds for Dependabot branches and docs/config/test-only commits
+- `vercel.json` sets `ignoreCommand` → `scripts/vercel-ignore-build.sh`: skips builds for Dependabot branches and docs/config/test-only commits; it also sets security headers (admin: noindex, no-store)
+- `.vercelignore` keeps tests, migrations and dev scripts off the public site
+- Env vars live in Vercel; document every new one in `.env.example`
+- Migrations are applied to the hosted Supabase project by hand (or via Supabase's GitHub integration once connected); never edit one after it has been applied
 
 ## Workflow
 

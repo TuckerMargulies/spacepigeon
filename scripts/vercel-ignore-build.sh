@@ -37,6 +37,8 @@ if git diff --quiet "$BASE" HEAD -- \
   ':(exclude)docs' \
   ':(exclude).github' \
   ':(exclude)e2e' \
+  ':(exclude)tests' \
+  ':(exclude)supabase' \
   ':(exclude)playwright.config.mjs' \
   ':(exclude)scripts/check.mjs' 2>/dev/null; then
   echo "Docs/config-only changes on ${VERCEL_GIT_COMMIT_REF:-unknown} — skipping build."
