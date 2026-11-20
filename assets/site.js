@@ -502,7 +502,7 @@ class Component extends DCLogic {
 '    float ant=sdCap(p,vec3(0.,0.62,-0.52),vec3(0.,0.98,-0.82),0.012);if(ant<d){d=ant;gMat=3.;}',
 '  }',
 '  return d;}',
-'float glassH(vec3 p){float o=hOuter(p);return max(abs(o+0.016)-0.006,0.03-hv(p));}',
+'float glassH(vec3 p){float o=hOuter(p);return max(max(abs(o+0.016)-0.006,0.03-hv(p)),dot(p-gSE,SD)+0.035);}',
 
 /* ---------- pigeon: rock dove after the original illustration, facing +z ---------- */
 /* ---------- hero: helmet fitted to the pigeon mesh (model units), mesh drawn separately ---------- */
