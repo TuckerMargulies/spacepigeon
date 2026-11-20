@@ -242,7 +242,7 @@ class Component extends DCLogic {
           pitch = 0.06 + 0.04 * Math.sin(ta * 0.35) + v.pitch;
           off = [0, -0.03 + 0.05 * Math.sin(t * 0.8), 0];
           if (a > 1.15) { shift = [Math.min(a * 0.19, 0.42), 0.0]; dist = 6.0; }
-          else { shift = [0, -0.18]; dist = 7.4; }
+          else { shift = [0, -0.1]; dist = 7.4 * Math.max(1, 0.75 / a); }
         } else if (v.scene === 1 || v.scene === 2) {
           yaw = -1.0 + ta * 0.3 + v.yaw;
           pitch = 0.14 + v.pitch;
@@ -254,7 +254,7 @@ class Component extends DCLogic {
           pitch = 0.05 * Math.sin(t * 0.27) + v.pitch;
           off = [0, 0.04 * Math.sin(t * 1.3), 0];
           if (a > 1.15) { shift = [Math.min(a * 0.2, 0.42), 0]; dist = 8.6; stack = 0; }
-          else { shift = [0, -0.5 + 330 / ch]; dist = 1.9 * 3.6 / (620 / ch); stack = 1; }
+          else { shift = [0, -0.5 + 330 / ch]; dist = Math.max(1.9 * 3.6 / (620 / ch), 4.2 / a); stack = 1; }
         }
         var u = v.u;
         gl.useProgram(v.prog);
@@ -702,7 +702,7 @@ class Component extends DCLogic {
 'void main(){',
 '  vec2 uv=(gl_FragCoord.xy-0.5*uRes)/uRes.y;uv-=uShift;',
 '  vec3 ro=vec3(0.,0.,uDist);vec3 rd=normalize(vec3(uv,-1.9));',
-'  if(uScene<0.5){gSE=vec3(0.,-0.35,0.02)+SD*0.25;gR2=1.0;}',
+'  if(uScene<0.5){gSE=vec3(0.,-0.35,0.02)+vec3(0.,-0.78,-0.63)*0.7;gR2=0.92;}',
 '  if(uScene<0.5&&uPass<0.5){vec3 bg=background(ro,rd,uv);bg=1.-exp(-bg);bg=pow(bg,vec3(0.4545));bg+=(hash12(gl_FragCoord.xy)-0.5)/255.;gl_FragColor=vec4(bg,1.);return;}',
 '  vec3 lro=toLocal(ro);vec3 lrd=toLocalDir(rd);',
 '  vec3 bc=uScene<0.5?(HH-MC)*MK:vec3(0.);float bR=uScene<0.5?0.5:(uScene<2.5?1.45:2.25);',
