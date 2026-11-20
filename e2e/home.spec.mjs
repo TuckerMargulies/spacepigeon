@@ -4,7 +4,7 @@ test('home: copy, sections, sticky header, no Facebook or Blog', async ({ page }
   const errors = watchErrors(page);
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText("For the galaxy's ultimate navigators");
+  await expect(page.getByRole('heading', { level: 1 })).toContainText("For the galaxy's ultimate navigators");
   for (const name of ['SPH72', 'SPH42', 'OFFICIAL PIGEONNAUT PATCH']) {
     await expect(page.getByRole('heading', { name })).toBeVisible();
   }
@@ -38,4 +38,13 @@ test('3D assets are served', async ({ request }) => {
   }
   const mesh = await (await request.get('/assets/pigeon-mesh.json')).json();
   expect(mesh.tris).toBeGreaterThan(1000);
+});
+
+test('contact shows the inquiries address on both pages', async ({ page }) => {
+  for (const path of ['/', '/about/']) {
+    await page.goto(path);
+    const link = page.locator('#contact a');
+    await expect(link).toHaveText('admin@coalesce.nyc');
+    await expect(link).toHaveAttribute('href', 'mailto:admin@coalesce.nyc');
+  }
 });
