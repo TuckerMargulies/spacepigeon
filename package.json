@@ -1,0 +1,14 @@
+{
+  "name": "spacepigeon",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "python3 -m http.server 8000",
+    "lint": "node scripts/check.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}

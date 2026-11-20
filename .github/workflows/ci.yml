@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [staging, main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Check the site (script parses, assets exist, no template holes)
+        run: npm run lint
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    timeout-minutes: 20
+    steps:
+      - name: Decide whether E2E runs
+        id: check-skip
+        # Values are read through env, never `${{ }}` inside `run:`.
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HAS_SKIP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
+        run: |
+          if [ "$BASE_REF" = "main" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping E2E (release PR targeting main — already tested on staging)"
+          elif [ "$HAS_SKIP_LABEL" = "true" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping E2E (skip-e2e label)"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check-skip.outputs.skip != 'true'
+      - uses: actions/setup-node@v4
+        if: steps.check-skip.outputs.skip != 'true'
+        with:
+          node-version-file: .nvmrc
+      - name: Install dependencies
+        if: steps.check-skip.outputs.skip != 'true'
+        run: npm install --no-audit --no-fund
+      - name: Install Playwright browsers
+        if: steps.check-skip.outputs.skip != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E tests
+        if: steps.check-skip.outputs.skip != 'true'
+        run: npm run test:e2e
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
