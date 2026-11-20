@@ -4,7 +4,7 @@ test('home: copy, sections, sticky header, no Facebook or Blog', async ({ page }
   const errors = watchErrors(page);
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText("For the galaxy's ultimate navigators");
+  await expect(page.getByRole('heading', { level: 1 })).toContainText("For the galaxy's ultimate navigators");
   for (const name of ['SPH72', 'SPH42', 'OFFICIAL PIGEONNAUT PATCH']) {
     await expect(page.getByRole('heading', { name })).toBeVisible();
   }

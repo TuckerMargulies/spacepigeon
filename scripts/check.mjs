@@ -34,6 +34,15 @@ for (const page of PAGES) {
     const path = m[1].replace(/^\//, '');
     if (!existsSync(path)) problems.push(`${page}: missing script ${m[1]}`);
   }
+  for (const m of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
+    try { JSON.parse(m[1]); } catch (e) { problems.push(`${page}: structured data is not valid JSON: ${e.message}`); }
+  }
+  for (const m of html.matchAll(/<link rel="(?:icon|apple-touch-icon|manifest)" href="(\/[^"]+)"/g)) {
+    if (!existsSync(m[1].slice(1))) problems.push(`${page}: missing ${m[1]}`);
+  }
+  for (const m of html.matchAll(/content="https:\/\/spacepigeon\.net(\/assets\/[^"]+)"/g)) {
+    if (!existsSync(m[1].slice(1))) problems.push(`${page}: missing ${m[1]}`);
+  }
   checkAssets(page, html);
   if (/\{\{[^}]*\}\}/.test(html)) problems.push(`${page}: unfilled template hole ({{ … }})`);
   if (/\/_blob\/|\.dc\.html/.test(html)) problems.push(`${page}: canvas-only URL (/_blob/ or .dc.html) left in`);
