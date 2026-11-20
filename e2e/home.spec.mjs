@@ -18,6 +18,12 @@ test('home: copy, sections, sticky header, no Facebook or Blog', async ({ page }
 
   await expect(page.getByRole('link', { name: 'Facebook' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Blog' })).toHaveCount(0);
+  for (const [name, href] of [['Instagram', 'https://www.instagram.com/coalescenyc/'], ['LinkedIn', 'https://www.linkedin.com/company/coalesce-creative']]) {
+    for (const link of await page.getByRole('link', { name }).all()) {
+      await expect(link).toHaveAttribute('href', href);
+      await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    }
+  }
 
   await page.mouse.wheel(0, 2000);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
