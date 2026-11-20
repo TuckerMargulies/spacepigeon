@@ -20,7 +20,7 @@ test('home renders every scene without errors', async ({ page }) => {
 });
 
 test('3D assets are served', async ({ request }) => {
-  for (const path of ['/assets/pigeon-mesh.json', '/assets/patch.png']) {
+  for (const path of ['/assets/pigeon-mesh.json', '/assets/patch-round.jpg', '/assets/patch-pigeon.jpg', '/assets/patch-pigeon-sdf.png']) {
     const res = await request.get(path);
     expect(res.status(), path).toBe(200);
   }
@@ -36,4 +36,19 @@ test('section links point at real sections', async ({ page }) => {
   for (const href of await links.evaluateAll((els) => els.map((el) => el.getAttribute('href')))) {
     await expect(page.locator(href)).toHaveCount(1);
   }
+});
+
+test('header: sticky while scrolling, no Facebook or Blog links', async ({ page }) => {
+  await page.addInitScript(() => {
+    HTMLCanvasElement.prototype.getContext = function () { return null; };
+  });
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Facebook' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Blog' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Instagram' }).first()).toBeVisible();
+  await page.mouse.wheel(0, 2000);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
+  const nav = page.getByRole('navigation', { name: 'Primary' });
+  await expect(nav).toBeInViewport();
+  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeInViewport();
 });

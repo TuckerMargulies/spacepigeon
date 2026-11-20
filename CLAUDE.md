@@ -30,14 +30,16 @@ Always run `npm run lint` and `npm test` before committing and `npm run test:e2e
 ## Project structure
 
 ```
-index.html                 # The whole site (+ the order request dialog)
+index.html                 # Home page markup (+ the order request dialog)
+assets/site.js             # The 3D renderer for every page (generated from the canvas; data-sp-scene, data-sp-bg)
 admin/index.html           # Light admin: order requests list + status (email-link sign-in)
 api/order-request.js       # POST: file an order request, email confirmation (CC admin)
 api/admin/                 # login (email a link), session (link → cookie), orders (list, set status)
 api/_lib/                  # Shared: validation (orders.js), db.js (only Supabase caller), email.js, tokens.js, env.js
 supabase/migrations/       # SQL for order_requests
 assets/order.js            # Order request dialog
-assets/patch.png           # Patch artwork, mapped onto the 3D patch
+assets/patch-round.jpg     # Round mission patch (2018B), unwarped from a photo of the real patch
+assets/patch-pigeon.jpg    # Die-cut pigeon patch colour + patch-pigeon-sdf.png (its outline as a distance field)
 assets/pigeon-mesh.json    # Hero pigeon: packed positions, normals, material ids (from the purchased OBJ)
 e2e/                       # Playwright tests (support/stub-services.mjs stands in for Supabase + Resend)
 tests/                     # Unit tests
@@ -46,7 +48,7 @@ scripts/check.mjs          # npm run lint
 scripts/vercel-ignore-build.sh
 ```
 
-The design source is the Claude Design canvas "Space Pigeon — 3D Rebuild". `index.html`'s 3D script and markup are exported from it; the order dialog and `data-order` buttons live only here — keep them when re-exporting.
+The design source is the Claude Design canvas "Space Pigeon — 3D Rebuild". Page markup and `assets/site.js` are exported from it; the order dialog and `data-order` buttons live only here — keep them when re-exporting. Asset paths are absolute (`/assets/…`) so every page can share them.
 
 Order requests, admin and email rules: `.claude/rules/orders.md`. Env vars: `.env.example`.
 
