@@ -1,16 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, STUB } from './support/test.mjs';
 import { validOrder } from './support/fixtures.mjs';
 
-const STUB = 'http://localhost:8788';
 
 
 
-test.beforeEach(async ({ page, request }) => {
+test.beforeEach(async ({ request }) => {
   await request.post(`${STUB}/__reset`);
-  // These tests are about the form, not the 3D: skip WebGL so they run fast.
-  await page.addInitScript(() => {
-    HTMLCanvasElement.prototype.getContext = function () { return null; };
-  });
 });
 
 test('Place Order files a request and emails a confirmation with admin on CC', async ({ page, request }) => {

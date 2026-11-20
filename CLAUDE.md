@@ -32,6 +32,8 @@ Always run `npm run lint` and `npm test` before committing and `npm run test:e2e
 ```
 index.html                 # Home page markup (+ the order request dialog)
 assets/site.js             # The 3D renderer for every page (generated from the canvas; data-sp-scene, data-sp-bg)
+about/index.html           # About: the original story and pigeon facts, live planet hero (data-sp-bg)
+assets/about-space.jpg     # Still of the planet scene; shows until WebGL draws (and without it)
 admin/index.html           # Light admin: order requests list + status (email-link sign-in)
 api/order-request.js       # POST: file an order request, email confirmation (CC admin)
 api/admin/                 # login (email a link), session (link → cookie), orders (list, set status)
@@ -60,6 +62,8 @@ Order requests, admin and email rules: `.claude/rules/orders.md`. Env vars: `.en
 ## Testing
 
 Every change that touches `index.html` or `assets/` updates or adds an E2E test in the same PR.
+
+- Specs import `test` from `e2e/support/test.mjs`, which turns WebGL **off** (software rendering is slow and most tests are about markup, forms and the API). Only `e2e/webgl.spec.mjs` turns it on, at a small viewport, to check every shader compiles on every page. Keep it that way: the whole suite should run in well under a minute.
 
 ## CI
 
