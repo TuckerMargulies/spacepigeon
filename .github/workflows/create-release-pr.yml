@@ -1,0 +1,60 @@
+name: Create Release PR
+
+# Creates or updates the staging → main release PR whenever staging changes.
+# The body lists every commit in staging that main doesn't have yet.
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  release-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Open or update release PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git fetch origin main staging
+
+          AHEAD=$(git rev-list --count origin/main..origin/staging)
+          if [ "$AHEAD" = "0" ]; then
+            echo "staging is not ahead of main — nothing to release."
+            exit 0
+          fi
+
+          {
+            echo "## Release Summary"
+            echo
+            echo "Merging promotes everything on \`staging\` to \`main\` (production). $AHEAD commit(s)."
+            echo
+            echo "### Commits"
+            echo
+            git log origin/main..origin/staging --no-merges --format='- %s (%h)'
+            echo
+            echo "### Deployment Checklist"
+            echo
+            echo "- [ ] All changes verified in QA on staging"
+            echo "- [ ] No critical bugs on staging"
+            echo "- [ ] Production env vars verified in Vercel"
+            echo
+            echo "*Last updated: $(date -u +'%Y-%m-%d %H:%M UTC')*"
+          } > /tmp/pr_body.md
+
+          TITLE="Release: $(date -u +%Y-%m-%d)"
+          EXISTING=$(gh pr list --base main --head staging --state open --json number --jq '.[0].number' || true)
+          if [ -n "$EXISTING" ]; then
+            gh pr edit "$EXISTING" --title "$TITLE" --body-file /tmp/pr_body.md
+          else
+            gh pr create --base main --head staging --title "$TITLE" --body-file /tmp/pr_body.md
+          fi
